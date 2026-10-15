@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { obnovRozmery, titulekOkna } from '../lib/okno.js';
+import { obnovRozmery, rezimListy, titulekOkna } from '../lib/okno.js';
 
 const PRIMARNI = { x: 0, y: 0, width: 1920, height: 1040 };
 const DRUHY = { x: 1920, y: 0, width: 2560, height: 1400 };
@@ -39,4 +39,12 @@ test('titulek okna nese adresu organizace', () => {
   assert.equal(titulekOkna('Úkoly', 'tengo.killbottleneck.com'), 'Úkoly — tengo.killbottleneck.com');
   assert.equal(titulekOkna('', 'tengo.killbottleneck.com'), 'killBottleneck — tengo.killbottleneck.com');
   assert.equal(titulekOkna('Mapa', ''), 'Mapa');
+});
+
+test('barva lišty okna podle stránky', () => {
+  assert.equal(rezimListy('#1d2638'), 'dark', 'výchozí tmavý killBottleneck');
+  assert.equal(rezimListy('#121F32'), 'dark');
+  assert.equal(rezimListy('#f7f3ea'), 'light', 'světlý vzhled');
+  assert.equal(rezimListy(null), 'dark');
+  assert.equal(rezimListy('nesmysl'), 'dark');
 });

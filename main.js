@@ -7,7 +7,7 @@
 // lib/politika.js jako čisté funkce s testy; tady se jen napojuje na události Electronu.
 import {
   BrowserWindow, Menu, Notification, Tray, app, clipboard, crashReporter, dialog, ipcMain,
-  nativeImage, powerMonitor, protocol, screen, session, shell,
+  nativeImage, nativeTheme, powerMonitor, protocol, screen, session, shell,
 } from 'electron';
 import { appendFileSync, existsSync, writeFileSync } from 'node:fs';
 import { lookup } from 'node:dns/promises';
@@ -22,7 +22,7 @@ import { Hlidac, rozdelUpozorneni } from './lib/hlidac.js';
 import { jazykZLocale, vytvorPreklad } from './lib/i18n.js';
 import { vytvorLog } from './lib/log.js';
 import * as nastaveni from './lib/nastaveni.js';
-import { obnovRozmery, titulekOkna } from './lib/okno.js';
+import { obnovRozmery, rezimListy, titulekOkna } from './lib/okno.js';
 import {
   Brzda, MISTNI_ORIGIN, MISTNI_SCHEMA, mistniSoubor, originOf, rozhodniNavigaci,
   rozhodniOtevreni, smiKanal, smiOpravneni, smiVen,
@@ -740,6 +740,12 @@ function vytvorOkno() {
     if (prikaz === 'browser-forward' && wc.navigationHistory.canGoForward()) wc.navigationHistory.goForward();
   });
 
+  // Lišta okna podle barvy stránky (místní stránky rámu jsou tmavé, server ohlásí theme-color).
+  wc.on('did-change-theme-color', (_e, barva) => {
+    const rezim = oknoUkazujeServer() ? rezimListy(barva) : 'dark';
+    if (nativeTheme.themeSource !== rezim) nativeTheme.themeSource = rezim;
+    e2e('lista', { barva, rezim });
+  });
   wc.on('page-title-updated', (e, titulek) => {
     e.preventDefault();
     okno.setTitle(oknoUkazujeServer() ? titulekOkna(titulek, hostAktivni()) : 'killBottleneck');
@@ -907,6 +913,9 @@ function e2eOvladani() {
 async function start() {
   if (process.platform === 'win32') app.setAppUserModelId(APP_ID);
   Menu.setApplicationMenu(null);
+  // Tmavá lišta okna od startu (rám i výběr organizace jsou tmavé); stránka serveru ji pak
+  // může přepnout podle své barvy (did-change-theme-color).
+  nativeTheme.themeSource = 'dark';
 
   stav.log = vytvorLog(app.getPath('logs'));
   stav.cestaNastaveni = join(app.getPath('userData'), 'nastaveni.json');
