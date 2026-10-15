@@ -1,0 +1,88 @@
+{
+  "name": "killbottleneck-desktop",
+  "productName": "killBottleneck",
+  "version": "1.0.0",
+  "description": "killBottleneck for Windows — your organization's killBottleneck in its own window, with Windows notifications.",
+  "author": "Tengo s.r.o. <info@killbottleneck.com>",
+  "homepage": "https://killbottleneck.com",
+  "license": "SEE LICENSE IN LICENSE",
+  "private": true,
+  "type": "module",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test \"tests/*.test.js\"",
+    "dist": "electron-builder --win --x64 --publish never",
+    "ikony": "python3 scripts/ikony.py"
+  },
+  "dependencies": {
+    "electron-updater": "6.8.9"
+  },
+  "devDependencies": {
+    "electron": "44.7.2",
+    "electron-builder": "26.15.3"
+  },
+  "build": {
+    "appId": "com.killbottleneck.app",
+    "productName": "killBottleneck",
+    "executableName": "killBottleneck",
+    "copyright": "© 2026 Tengo s.r.o.",
+    "files": [
+      "main.js",
+      "preload.cjs",
+      "lib/**/*",
+      "ui/**/*",
+      "i18n/**/*",
+      "build/tray/**/*",
+      "build/odznak/**/*",
+      "LICENSE",
+      "package.json"
+    ],
+    "asar": true,
+    "directories": {
+      "buildResources": "build",
+      "output": "dist"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.png",
+      "requestedExecutionLevel": "asInvoker"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "runAfterFinish": true,
+      "deleteAppDataOnUninstall": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "killBottleneck",
+      "artifactName": "killBottleneck-Setup.${ext}",
+      "include": "build/installer.nsh"
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "tengolabs",
+        "repo": "killbottleneck-desktop",
+        "releaseType": "release"
+      }
+    ],
+    "electronFuses": {
+      "runAsNode": false,
+      "enableCookieEncryption": true,
+      "enableNodeOptionsEnvironmentVariable": false,
+      "enableNodeCliInspectArguments": false,
+      "enableEmbeddedAsarIntegrityValidation": true,
+      "onlyLoadAppFromAsar": true,
+      "loadBrowserProcessSpecificV8Snapshot": false,
+      "grantFileProtocolExtraPrivileges": false
+    }
+  }
+}

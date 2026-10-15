@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="cs">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>killBottleneck</title>
+  <link rel="stylesheet" href="styl.css">
+  <script src="spolecne.js" defer></script>
+  <script src="offline.js" defer></script>
+</head>
+<body>
+  <main class="obal">
+    <div class="hlavicka">
+      <img src="znak.png" alt="killBottleneck" class="znak" width="131" height="80">
+      <h1 id="titulek"></h1>
+      <p class="uvod" id="popis"></p>
+      <div class="tocic" id="tocic" hidden></div>
+    </div>
+
+    <section class="karta" id="karta" hidden>
+      <div class="tlacitka">
+        <p class="napoveda" data-t="offline.automaticky"></p>
+        <button type="button" id="znovu" data-t="offline.zkusitZnovu"></button>
+        <button type="button" class="odkaz" id="zmenit" data-t="offline.zmenit"></button>
+      </div>
+    </section>
+
+    <p class="paticka" id="paticka" hidden>
+      <button type="button" class="odkaz" id="zmenit2" data-t="offline.zmenit"></button>
+    </p>
+  </main>
+</body>
+</html>

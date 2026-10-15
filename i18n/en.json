@@ -1,0 +1,90 @@
+{
+  "tray": {
+    "otevrit": "Open killBottleneck",
+    "organizace": "Organization",
+    "pridatOrganizaci": "Add organization…",
+    "autostart": "Start when the computer starts",
+    "aktualizovat": "Restart and update (version {{verze}})",
+    "oAplikaci": "About",
+    "ukoncit": "Quit",
+    "tooltip": "killBottleneck",
+    "tooltipN": "killBottleneck — unread notifications: {{n}}"
+  },
+  "odznak": {
+    "popis": "Unread notifications: {{n}}"
+  },
+  "upozorneni": {
+    "dalsi": "And {{n}} more notifications — click to see them.",
+    "prihlasteSeTitulek": "Your sign-in expired",
+    "prihlasteSe": "Notifications are paused. Open the app and sign in again.",
+    "ulozenoStazene": "Saved to the Downloads folder: {{soubor}}",
+    "aktualizacePripravena": "Version {{verze}} is ready. It installs itself when you close the app — or right away from the menu by the clock.",
+    "beziDal": "killBottleneck keeps running by the clock and watches your notifications."
+  },
+  "autostart": {
+    "titulek": "killBottleneck",
+    "otazka": "killBottleneck keeps running by the clock and watches your notifications. Start it whenever the computer starts?",
+    "detail": "The icon sits in the notification area at the bottom right. Windows 11 often hides it under the ^ arrow — drag it from there onto the taskbar to keep it visible. You can change this any time in the icon's menu.",
+    "ano": "Yes, start it",
+    "ne": "No"
+  },
+  "oAplikaci": {
+    "titulek": "About",
+    "nadpis": "killBottleneck for Windows",
+    "verzeAplikace": "Windows app {{verze}}",
+    "verzeServeru": "Server {{host}}: version {{verze}}",
+    "serverNeznamy": "Server version: unknown",
+    "technika": "Electron {{electron}} · Chromium {{chrome}}",
+    "slozkaLogu": "Open the log folder",
+    "zavrit": "Close"
+  },
+  "menu": {
+    "vyjmout": "Cut",
+    "kopirovat": "Copy",
+    "vlozit": "Paste",
+    "vybratVse": "Select all",
+    "otevritOdkaz": "Open link in browser",
+    "kopirovatOdkaz": "Copy link address"
+  },
+  "stranky": {
+    "vyber": {
+      "titulek": "Sign in to killBottleneck",
+      "uvod": "Enter your company name — just like when you sign in on the web.",
+      "nazevFirmy": "Company name",
+      "pokracovat": "Continue",
+      "overuji": "Looking…",
+      "rucne": "Enter the address manually (your own server)",
+      "adresa": "Server address",
+      "napovedaAdresy": "For example kb.mycompany.com, or http://192.168.1.20:8090 on your local network.",
+      "zpetNaFirmu": "Back to company name",
+      "nemateOrganizaci": "No organization yet?",
+      "vyzkouset": "Try it free",
+      "ulozene": "Your organizations",
+      "odebrat": "Remove",
+      "odebratPopis": "Remove {{host}} from the list",
+      "chyby": {
+        "kratke": "The name is too short — an organization address has at least 3 characters.",
+        "nenalezeno": "We couldn't find the organization {{host}}. Check the name — the exact address is in your welcome e-mail.",
+        "nedostupne": "The server {{host}} isn't responding. Check your internet connection and try again.",
+        "neniKb": "killBottleneck isn't running at {{host}}.",
+        "prazdne": "Enter the server address.",
+        "neplatne": "That doesn't look like a server address — kb.mycompany.com is enough.",
+        "httpVerejne": "Unencrypted connections (http://) only work on a local network. Use https:// on the internet.",
+        "httpMimoSit": "{{host}} leads outside your local network — an unencrypted connection (http://) can't be used there. Use https://.",
+        "starsiServer": "The server {{host}} runs an older version of killBottleneck — the Windows app will work with it, but some things may not.",
+        "jine": "Something went wrong. Please try again."
+      }
+    },
+    "offline": {
+      "titulek": "The server isn't responding",
+      "popis": "The server {{host}} isn't responding right now.",
+      "popisSit": "The computer may be offline, or the server is down at the moment.",
+      "popisServer": "The server reports an error — it's probably being updated.",
+      "popisNeniKb": "killBottleneck isn't running at {{host}}.",
+      "automaticky": "I'll try again by myself in a moment.",
+      "zkusitZnovu": "Try again",
+      "zmenit": "Change organization",
+      "pripojuji": "Connecting to {{host}}…"
+    }
+  }
+}

@@ -1,0 +1,117 @@
+name: build
+
+# Instalačka pro Windows. Tag v* → KONCEPT vydání (draft) s instalačkou a soubory pro
+# automatické aktualizace. Zveřejní se až po klik-testu, a to TATÁŽ binárka (žádná nová
+# stavba): gh release edit vX.Y.Z --draft=false --latest. Publikování koncept workflow
+# znovu nespustí (reaguje jen na push tagu a ruční běh).
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    env:
+      # Podpis Tengo s.r.o. (Azure Artifact Signing) se zapne sám, jakmile budou přístupy
+      # v chráněném prostředí repa. Do té doby se staví bez podpisu.
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+    steps:
+      # Akce pinované na commit SHA (verze v komentáři). persist-credentials:false → token
+      # s právem zápisu NEzůstane v .git/config pro postinstall skripty závislostí.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Testy
+        run: npm test
+
+      # Tag musí sedět s package.json — v TÉMŽE jobu, ať nesoulad stavbu zastaví
+      # (u kbCalc byla kontrola v jiném workflow a vydání proběhlo i tak).
+      - name: Tag odpovídá verzi
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: |
+          verze="$(node -p "require('./package.json').version")"
+          [ "${GITHUB_REF_NAME}" = "v${verze}" ] || { echo "::error::tag ${GITHUB_REF_NAME} ≠ v${verze}"; exit 1; }
+
+      # Bez GH_TOKEN: token nemá co dělat v prostředí stovek závislostí electron-builderu.
+      - name: Stavba (bez podpisu)
+        if: env.AZURE_CLIENT_ID == ''
+        run: npx electron-builder --win --x64 --publish never
+
+      - name: Stavba s podpisem Tengo s.r.o.
+        if: env.AZURE_CLIENT_ID != ''
+        run: >-
+          npx electron-builder --win --x64 --publish never
+          -c.win.azureSignOptions.publisherName="${{ vars.AZURE_PUBLISHER_NAME }}"
+          -c.win.azureSignOptions.endpoint="${{ vars.AZURE_SIGNING_ENDPOINT }}"
+          -c.win.azureSignOptions.certificateProfileName="${{ vars.AZURE_CERT_PROFILE }}"
+          -c.win.azureSignOptions.codeSigningAccountName="${{ vars.AZURE_SIGNING_ACCOUNT }}"
+
+      # Instalace, spuštění, odinstalace — přesně jako u uživatele (per-user, bez admina).
+      - name: Smoke test instalačky
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Start-Process -FilePath 'dist\killBottleneck-Setup.exe' -ArgumentList '/S' -Wait
+          $exe = Get-ChildItem "$env:LOCALAPPDATA\Programs" -Recurse -Filter 'killBottleneck.exe' | Select-Object -First 1
+          if (-not $exe) { throw 'instalace nevytvořila killBottleneck.exe' }
+          $proces = Start-Process -FilePath $exe.FullName -ArgumentList '--smoke-test' -Wait -PassThru
+          Get-Content "$env:TEMP\killbottleneck-smoke.json"
+          if ($proces.ExitCode -ne 0) { throw "smoke test skončil kódem $($proces.ExitCode)" }
+          $zastupce = Get-ChildItem "$env:APPDATA\Microsoft\Windows\Start Menu\Programs" -Recurse -Filter 'killBottleneck.lnk' | Select-Object -First 1
+          if (-not $zastupce) { throw 'chybí zástupce ve Startu' }
+          # Autostart zapsaný aplikací musí odinstalace uklidit (build/installer.nsh).
+          reg add 'HKCU\Software\Microsoft\Windows\CurrentVersion\Run' /v killBottleneck /d "`"$($exe.FullName)`" --hidden" /f | Out-Null
+          $odinstalace = Get-ChildItem $exe.DirectoryName -Filter 'Uninstall*.exe' | Select-Object -First 1
+          Start-Process -FilePath $odinstalace.FullName -ArgumentList '/S' -Wait
+          Start-Sleep -Seconds 5
+          if (Test-Path $exe.FullName) { throw 'odinstalace nechala aplikaci na disku' }
+          $run = Get-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' -Name killBottleneck -ErrorAction SilentlyContinue
+          if ($run) { throw 'odinstalace nechala položku autostartu' }
+          if (Test-Path "$env:APPDATA\killBottleneck") { throw 'odinstalace nechala data v profilu' }
+          if (Test-Path "$env:LOCALAPPDATA\killbottleneck-desktop-updater") { throw 'odinstalace nechala mezipaměť aktualizací' }
+
+      - name: Kontrolní součty
+        shell: bash
+        run: |
+          cd dist
+          sha256sum killBottleneck-Setup.exe killBottleneck-Setup.exe.blockmap latest.yml > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      # Žádné upload-artifact: artefakty se počítají do kvóty úložiště Actions, assety vydání ne.
+      - name: Koncept vydání
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: >-
+          gh release create "${GITHUB_REF_NAME}" --draft --verify-tag
+          --title "killBottleneck for Windows ${GITHUB_REF_NAME#v}"
+          --notes "Draft — published after the click-test. Changes: see CHANGELOG.md."
+          dist/killBottleneck-Setup.exe dist/killBottleneck-Setup.exe.blockmap dist/latest.yml dist/SHA256SUMS.txt
+
+      # Ruční běh → koncept „test-build“ (nikdy veřejný, nikdy „latest“).
+      - name: Testovací koncept
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          gh release delete test-build --yes --cleanup-tag 2>/dev/null || true
+          gh release create test-build --draft --target "${GITHUB_SHA}" --title "test-build ${GITHUB_SHA::7}" \
+            --notes "Test build — not for distribution." \
+            dist/killBottleneck-Setup.exe dist/killBottleneck-Setup.exe.blockmap dist/latest.yml dist/SHA256SUMS.txt

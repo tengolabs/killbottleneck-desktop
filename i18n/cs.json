@@ -1,0 +1,90 @@
+{
+  "tray": {
+    "otevrit": "Otevřít killBottleneck",
+    "organizace": "Organizace",
+    "pridatOrganizaci": "Přidat organizaci…",
+    "autostart": "Spouštět po zapnutí počítače",
+    "aktualizovat": "Restartovat a aktualizovat (verze {{verze}})",
+    "oAplikaci": "O aplikaci",
+    "ukoncit": "Ukončit",
+    "tooltip": "killBottleneck",
+    "tooltipN": "killBottleneck — nepřečtená upozornění: {{n}}"
+  },
+  "odznak": {
+    "popis": "Nepřečtená upozornění: {{n}}"
+  },
+  "upozorneni": {
+    "dalsi": "A dalších {{n}} upozornění — klikněte pro zobrazení.",
+    "prihlasteSeTitulek": "Přihlášení vypršelo",
+    "prihlasteSe": "Upozornění teď nechodí. Otevřete aplikaci a přihlaste se znovu.",
+    "ulozenoStazene": "Uloženo do složky Stažené: {{soubor}}",
+    "aktualizacePripravena": "Nová verze {{verze}} je připravená. Nainstaluje se sama, až aplikaci zavřete — nebo hned přes menu u hodin.",
+    "beziDal": "killBottleneck běží dál vedle hodin a hlídá upozornění."
+  },
+  "autostart": {
+    "titulek": "killBottleneck",
+    "otazka": "killBottleneck poběží dál vedle hodin a bude hlídat upozornění. Spouštět ho i po zapnutí počítače?",
+    "detail": "Ikonu najdete v oznamovací oblasti vpravo dole. Ve Windows 11 bývá schovaná pod šipkou ^ — přetáhněte ji odtud na lištu, ať je pořád vidět. Volbu změníte kdykoli v menu ikony.",
+    "ano": "Ano, spouštět",
+    "ne": "Ne"
+  },
+  "oAplikaci": {
+    "titulek": "O aplikaci",
+    "nadpis": "killBottleneck pro Windows",
+    "verzeAplikace": "Aplikace pro Windows {{verze}}",
+    "verzeServeru": "Server {{host}}: verze {{verze}}",
+    "serverNeznamy": "Verze serveru: nezjištěna",
+    "technika": "Electron {{electron}} · Chromium {{chrome}}",
+    "slozkaLogu": "Otevřít složku s logy",
+    "zavrit": "Zavřít"
+  },
+  "menu": {
+    "vyjmout": "Vyjmout",
+    "kopirovat": "Kopírovat",
+    "vlozit": "Vložit",
+    "vybratVse": "Vybrat vše",
+    "otevritOdkaz": "Otevřít odkaz v prohlížeči",
+    "kopirovatOdkaz": "Kopírovat adresu odkazu"
+  },
+  "stranky": {
+    "vyber": {
+      "titulek": "Přihlášení do killBottlenecku",
+      "uvod": "Zadejte název firmy — stejně jako při přihlášení na webu.",
+      "nazevFirmy": "Název firmy",
+      "pokracovat": "Pokračovat",
+      "overuji": "Hledám…",
+      "rucne": "Zadat adresu ručně (vlastní server)",
+      "adresa": "Adresa serveru",
+      "napovedaAdresy": "Například kb.mojefirma.cz nebo http://192.168.1.20:8090 v místní síti.",
+      "zpetNaFirmu": "Zpět na název firmy",
+      "nemateOrganizaci": "Ještě nemáte organizaci?",
+      "vyzkouset": "Vyzkoušet zdarma",
+      "ulozene": "Vaše organizace",
+      "odebrat": "Odebrat",
+      "odebratPopis": "Odebrat {{host}} ze seznamu",
+      "chyby": {
+        "kratke": "Název je moc krátký — adresa organizace má aspoň 3 znaky.",
+        "nenalezeno": "Organizaci {{host}} jsme nenašli. Zkontrolujte název — přesná adresa je v uvítacím e-mailu.",
+        "nedostupne": "Server {{host}} teď neodpovídá. Zkontrolujte připojení k internetu a zkuste to znovu.",
+        "neniKb": "Na adrese {{host}} neběží killBottleneck.",
+        "prazdne": "Zadejte adresu serveru.",
+        "neplatne": "Tohle nevypadá jako adresa serveru — stačí například kb.mojefirma.cz.",
+        "httpVerejne": "Nešifrované spojení (http://) jde jen v místní síti. Na internetu použijte https://.",
+        "httpMimoSit": "Adresa {{host}} vede mimo místní síť — nešifrované spojení (http://) tam použít nejde. Použijte https://.",
+        "starsiServer": "Server {{host}} má starší verzi killBottlenecku — aplikace pro Windows s ním poběží, jen některé věci nemusí fungovat.",
+        "jine": "Něco se nepovedlo. Zkuste to prosím znovu."
+      }
+    },
+    "offline": {
+      "titulek": "Server neodpovídá",
+      "popis": "Server {{host}} teď neodpovídá.",
+      "popisSit": "Počítač asi není připojený k internetu, nebo server zrovna nejede.",
+      "popisServer": "Server hlásí chybu — nejspíš se právě aktualizuje.",
+      "popisNeniKb": "Na adrese {{host}} neběží killBottleneck.",
+      "automaticky": "Zkusím to znovu sám za chvíli.",
+      "zkusitZnovu": "Zkusit znovu",
+      "zmenit": "Změnit organizaci",
+      "pripojuji": "Připojuji k {{host}}…"
+    }
+  }
+}

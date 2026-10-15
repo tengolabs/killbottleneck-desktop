@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="cs">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>killBottleneck</title>
+  <link rel="stylesheet" href="styl.css">
+  <script src="spolecne.js" defer></script>
+  <script src="vyber.js" defer></script>
+</head>
+<body>
+  <main class="obal">
+    <div class="hlavicka">
+      <img src="znak.png" alt="killBottleneck" class="znak" width="131" height="80">
+      <h1 data-t="vyber.titulek"></h1>
+      <p class="uvod" data-t="vyber.uvod"></p>
+    </div>
+
+    <section class="karta">
+      <form id="formFirma" novalidate>
+        <label for="firma" data-t="vyber.nazevFirmy"></label>
+        <input id="firma" type="text" autocomplete="organization" maxlength="120" spellcheck="false" autofocus>
+        <p id="nahled" class="nahled" aria-live="polite"></p>
+        <p id="chybaFirma" class="chyba" role="alert" hidden></p>
+        <button type="submit" id="tlFirma" data-t="vyber.pokracovat"></button>
+        <button type="button" class="odkaz" id="naRucne" data-t="vyber.rucne"></button>
+      </form>
+
+      <form id="formAdresa" novalidate hidden>
+        <label for="adresa" data-t="vyber.adresa"></label>
+        <input id="adresa" type="text" inputmode="url" autocomplete="url" maxlength="300" spellcheck="false">
+        <p class="napoveda" data-t="vyber.napovedaAdresy"></p>
+        <p id="chybaAdresa" class="chyba" role="alert" hidden></p>
+        <button type="submit" id="tlAdresa" data-t="vyber.pokracovat"></button>
+        <button type="button" class="odkaz" id="naFirmu" data-t="vyber.zpetNaFirmu"></button>
+      </form>
+    </section>
+
+    <section class="karta" id="ulozene" hidden>
+      <h2 data-t="vyber.ulozene"></h2>
+      <ul id="seznam"></ul>
+    </section>
+
+    <p class="paticka">
+      <span data-t="vyber.nemateOrganizaci"></span>
+      <button type="button" class="odkaz" id="vyzkouset" data-t="vyber.vyzkouset"></button>
+    </p>
+  </main>
+</body>
+</html>
