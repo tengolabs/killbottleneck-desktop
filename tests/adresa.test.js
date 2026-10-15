@@ -29,6 +29,9 @@ test('vložená adresa z prohlížeče v poli firmy znamená tu firmu', () => {
   assert.equal(adresaFirmy('tengo.killbottleneck.com'), 'https://tengo.killbottleneck.com');
   assert.equal(adresaFirmy('https://tengo.killbottleneck.com/'), 'https://tengo.killbottleneck.com');
   assert.equal(adresaFirmy('Tengo.KillBottleneck.com'), 'https://tengo.killbottleneck.com');
+  assert.equal(adresaFirmy('https://tengo.killbottleneck.com/login'), 'https://tengo.killbottleneck.com', 'zkopírovaná adresa přihlášení');
+  assert.equal(adresaFirmy('tengo.killbottleneck.com/projects?x=1#a'), 'https://tengo.killbottleneck.com');
+  assert.notEqual(adresaFirmy('tengo.killbottleneck.com.evil.cz'), 'https://tengo.killbottleneck.com', 'cizí doména není naše adresa');
 });
 
 test('ruční adresa: chyby', () => {

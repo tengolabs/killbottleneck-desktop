@@ -75,6 +75,7 @@
       "popisSit": "The computer may be offline, or the server is down at the moment.",
       "popisServer": "The server reports an error — it's probably being updated.",
       "popisNeniKb": "killBottleneck isn't running at {{host}}.",
+      "popisMimoSit": "The server is on your company's local network and this computer isn't on it right now — the app won't use an unencrypted connection (http://) outside it.",
       "automaticky": "I'll try again by myself in a moment.",
       "zkusitZnovu": "Try again",
       "zmenit": "Change organization",

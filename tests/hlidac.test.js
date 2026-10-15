@@ -139,3 +139,49 @@ test('hlídač: stránka se ještě načítá → zkusit znovu za pár sekund, n
   await h.kolo();
   assert.deepEqual(planovano, [ZNOVU_PO_NELZE_MS, 60_000], 'po úspěchu zase po minutě');
 });
+
+test('hlídač: přepnutí organizace během kola — výsledek staré firmy se zahodí', async () => {
+  const zaznam = { ukaz: [], odznak: [] };
+  let pust;
+  const h = new Hlidac({
+    dotaz: () => new Promise((hotovo) => { pust = hotovo; }),
+    ukaz: (nove) => zaznam.ukaz.push(nove.map((x) => x.id)),
+    odznak: (p) => zaznam.odznak.push(p),
+    novaVerze() {}, odmitnuto() {},
+  });
+  const planovano = [];
+  h.naplanuj = (ms) => planovano.push(ms);
+  h.bezi = true;
+  const kolo = h.kolo();
+  h.reset(); // přepnuto na jinou firmu, zatímco se čeká na server té staré
+  pust({ stav: 'ok', uzivatel: 'stary', polozky: [n('a')], celkem: 7, serverCas: T0 });
+  await kolo;
+  assert.deepEqual(zaznam.odznak, [0], 'odznak nesmí ukázat počet staré firmy');
+  assert.equal(h.uzivatel, null, 'výchozí stav se nebere ze staré firmy');
+  assert.equal(h.stav.videne, null);
+  assert.equal(planovano[planovano.length - 1], ZNOVU_PO_NELZE_MS, 'nová firma se zeptá hned');
+});
+
+test('hlídač: reset a nepřihlášený se ptají hned, ne za minutu', async () => {
+  const planovano = [];
+  const h = new Hlidac({ dotaz: async () => ({ stav: 'neprihlasen' }), ukaz() {}, odznak() {}, novaVerze() {}, odmitnuto() {} });
+  h.naplanuj = (ms) => planovano.push(ms);
+  h.bezi = true;
+  h.reset();
+  assert.deepEqual(planovano, [ZNOVU_PO_NELZE_MS], 'reset přeplánuje');
+  await h.kolo();
+  assert.deepEqual(planovano, [ZNOVU_PO_NELZE_MS, ZNOVU_PO_NELZE_MS], 'stránka přihlášení: zkoušet často');
+});
+
+test('hlídač: ted() během běžícího kola se neztratí', async () => {
+  const planovano = [];
+  let pust;
+  const h = new Hlidac({ dotaz: () => new Promise((hotovo) => { pust = hotovo; }), ukaz() {}, odznak() {}, novaVerze() {}, odmitnuto() {} });
+  h.naplanuj = (ms) => planovano.push(ms);
+  h.bezi = true;
+  const kolo = h.kolo();
+  h.ted(); // probuzení počítače během dotazu
+  pust({ stav: 'ok', uzivatel: 'u1', polozky: [], celkem: 0, serverCas: T0 });
+  await kolo;
+  assert.equal(planovano[planovano.length - 1], ZNOVU_PO_NELZE_MS, 'po kole se zeptat hned znovu, ne za minutu');
+});

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
-  Brzda, MISTNI_ORIGIN, mistniSoubor, originOf, rozhodniNavigaci, rozhodniOtevreni, smiKanal, smiOpravneni, smiVen,
+  Brzda, MAX_STAZENI_ZA_MINUTU, MISTNI_ORIGIN, mistniSoubor, rozhodniStahovani, zonaInternet, originOf, rozhodniNavigaci, rozhodniOtevreni, smiKanal, smiOpravneni, smiVen,
 } from '../lib/politika.js';
 
 const SERVER = 'https://tengo.killbottleneck.com';
@@ -60,13 +60,15 @@ test('kdo smí volat který kanál', () => {
 
 test('oprávnění stránky', () => {
   const nas = { origin: SERVER, aktivniOrigin: SERVER };
-  assert.equal(smiOpravneni('media', { ...nas, mediaTypes: ['audio'] }), true, 'hlasovky');
-  assert.equal(smiOpravneni('media', { ...nas, mediaTypes: ['video'] }), false, 'kamera ne');
-  assert.equal(smiOpravneni('media', { ...nas, mediaTypes: ['audio', 'video'] }), false);
-  assert.equal(smiOpravneni('media', { ...nas, mediaTypes: [] }), false);
+  assert.equal(smiOpravneni('media', { ...nas, mediaTypes: ['audio'], vPopredi: true }), true, 'hlasovky');
+  assert.equal(smiOpravneni('media', { ...nas, mediaTypes: ['audio'], vPopredi: false }), false, 'skryté okno nenahrává');
+  assert.equal(smiOpravneni('media', { ...nas, mediaTypes: ['audio'] }), false, 'žádost bez údaje o okně = ne');
+  assert.equal(smiOpravneni('media', { ...nas, mediaTypes: ['video'], vPopredi: true }), false, 'kamera ne');
+  assert.equal(smiOpravneni('media', { ...nas, mediaTypes: ['audio', 'video'], vPopredi: true }), false);
+  assert.equal(smiOpravneni('media', { ...nas, mediaTypes: [], vPopredi: true }), false);
   assert.equal(smiOpravneni('media', { ...nas, mediaType: 'audio' }), true, 'kontrola (check handler)');
   assert.equal(smiOpravneni('media', { ...nas, mediaType: 'video' }), false);
-  assert.equal(smiOpravneni('media', { origin: 'https://evil.cz', aktivniOrigin: SERVER, mediaTypes: ['audio'] }), false);
+  assert.equal(smiOpravneni('media', { origin: 'https://evil.cz', aktivniOrigin: SERVER, mediaTypes: ['audio'], vPopredi: true }), false);
   assert.equal(smiOpravneni('clipboard-sanitized-write', nas), true);
   assert.equal(smiOpravneni('fullscreen', nas), true);
   assert.equal(smiOpravneni('openExternal', { ...nas, externalURL: 'mailto:a@b.cz' }), true);
@@ -76,6 +78,30 @@ test('oprávnění stránky', () => {
   }
   assert.equal(smiOpravneni('fullscreen', { origin: MISTNI_ORIGIN, aktivniOrigin: SERVER }), false);
   assert.equal(smiOpravneni('media', {}), false);
+});
+
+test('stahování: dávka bez dialogu jen viditelně, jen dokumenty, se stropem', () => {
+  const zaklad = { jmeno: 'mapa.pdf', davka: false, skryte: false, zaMinutu: 1 };
+  assert.equal(rozhodniStahovani(zaklad), 'dialog', 'jeden soubor = Uložit jako');
+  assert.equal(rozhodniStahovani({ ...zaklad, davka: true }), 'stazene', 'rozdělené PDF rovnou do Stažených');
+  assert.equal(rozhodniStahovani({ ...zaklad, davka: true, jmeno: 'Mapa.PPTX' }), 'stazene');
+  for (const jmeno of ['setup.exe', 'version.dll', 'faktura.pdf.exe', 'odkaz.url', 'x.lnk', 'x.scf', 'x.library-ms',
+    'x.hta', 'x.js', 'x.cmd', 'x.bat', 'x.ps1', 'x.msi', 'x.html', 'x.svg', 'bezpripony', 'x.pdf.']) {
+    assert.equal(rozhodniStahovani({ ...zaklad, davka: true, jmeno }), 'dialog', jmeno);
+  }
+  assert.equal(rozhodniStahovani({ ...zaklad, skryte: true }), 'zrusit', 'skryté okno nestahuje nic');
+  assert.equal(rozhodniStahovani({ ...zaklad, davka: true, skryte: true }), 'zrusit');
+  assert.equal(rozhodniStahovani({ ...zaklad, davka: true, zaMinutu: MAX_STAZENI_ZA_MINUTU }), 'stazene');
+  assert.equal(rozhodniStahovani({ ...zaklad, davka: true, zaMinutu: MAX_STAZENI_ZA_MINUTU + 1 }), 'zrusit', 'strop');
+  assert.equal(rozhodniStahovani({ ...zaklad, zaMinutu: MAX_STAZENI_ZA_MINUTU + 1 }), 'zrusit', 'ani dialogy bez konce');
+});
+
+test('značka „staženo z internetu“', () => {
+  assert.equal(zonaInternet('https://tengo.killbottleneck.com/api/files/c/r/a.pdf?token=TAJNE&x=1'),
+    '[ZoneTransfer]\r\nZoneId=3\r\nHostUrl=https://tengo.killbottleneck.com/api/files/c/r/a.pdf\r\n');
+  assert.equal(zonaInternet('blob:https://x.cz/123'), '[ZoneTransfer]\r\nZoneId=3\r\n', 'blob bez adresy');
+  assert.equal(zonaInternet('nesmysl'), '[ZoneTransfer]\r\nZoneId=3\r\n');
+  assert.ok(!/[\r\n]HostUrl=.*[\r\n]./.test(zonaInternet('https://x.cz/a%0d%0aZoneId=0')), 'adresa nevloží řádek');
 });
 
 test('brzda odkazů ven', () => {

@@ -4,41 +4,43 @@ name: build
 # automatické aktualizace. Zveřejní se až po klik-testu, a to TATÁŽ binárka (žádná nová
 # stavba): gh release edit vX.Y.Z --draft=false --latest. Publikování koncept workflow
 # znovu nespustí (reaguje jen na push tagu a ruční běh).
+#
+# Dva joby: stavba běží se stovkami závislostí, a proto jen s právem ČÍST. Právo zapisovat
+# (vytvořit vydání) má jen druhý job, který nic neinstaluje — jen nahraje hotové soubory.
+# Kompromitovaná závislost tak nedostane token, kterým by vydala aktualizaci všem.
 on:
   push:
     tags: ['v*']
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  windows:
+  stavba:
     runs-on: windows-latest
-    env:
-      # Podpis Tengo s.r.o. (Azure Artifact Signing) se zapne sám, jakmile budou přístupy
-      # v chráněném prostředí repa. Do té doby se staví bez podpisu.
-      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-      AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+    permissions:
+      contents: read
     steps:
-      # Akce pinované na commit SHA (verze v komentáři). persist-credentials:false → token
-      # s právem zápisu NEzůstane v .git/config pro postinstall skripty závislostí.
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      # Akce pinované na commit SHA (verze v komentáři) — tag jde přepsat, SHA ne.
+      # persist-credentials:false → token NEzůstane v .git/config.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+      # Bez mezipaměti npm: vydání nesmí stavět z mezipaměti, kterou mohl naplnit jiný běh.
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 24
-          cache: npm
 
-      - run: npm ci
+      # --ignore-scripts: instalační skripty závislostí se nespouští (electron-builder si
+      # Electron pro Windows stahuje sám, ověřený kontrolním součtem).
+      - run: npm ci --ignore-scripts
 
       - name: Testy
         run: npm test
 
-      # Tag musí sedět s package.json — v TÉMŽE jobu, ať nesoulad stavbu zastaví
+      # Tag musí sedět s package.json — v TÉMŽE workflow před stavbou, ať nesoulad stavbu zastaví
       # (u kbCalc byla kontrola v jiném workflow a vydání proběhlo i tak).
       - name: Tag odpovídá verzi
         if: startsWith(github.ref, 'refs/tags/v')
@@ -47,13 +49,18 @@ jobs:
           verze="$(node -p "require('./package.json').version")"
           [ "${GITHUB_REF_NAME}" = "v${verze}" ] || { echo "::error::tag ${GITHUB_REF_NAME} ≠ v${verze}"; exit 1; }
 
-      # Bez GH_TOKEN: token nemá co dělat v prostředí stovek závislostí electron-builderu.
       - name: Stavba (bez podpisu)
-        if: env.AZURE_CLIENT_ID == ''
+        if: vars.AZURE_SIGNING_ACCOUNT == ''
         run: npx electron-builder --win --x64 --publish never
 
+      # Přístupy k podpisu Tengo s.r.o. (Azure Artifact Signing) jen v TOMTO kroku, ne v celém
+      # jobu — instalace závislostí výš je nevidí. Zapne se doplněním proměnných a tajemství repa.
       - name: Stavba s podpisem Tengo s.r.o.
-        if: env.AZURE_CLIENT_ID != ''
+        if: vars.AZURE_SIGNING_ACCOUNT != ''
+        env:
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
         run: >-
           npx electron-builder --win --x64 --publish never
           -c.win.azureSignOptions.publisherName="${{ vars.AZURE_PUBLISHER_NAME }}"
@@ -88,30 +95,57 @@ jobs:
       - name: Kontrolní součty
         shell: bash
         run: |
-          cd dist
+          mkdir vydani
+          cp dist/killBottleneck-Setup.exe dist/killBottleneck-Setup.exe.blockmap dist/latest.yml vydani/
+          cd vydani
           sha256sum killBottleneck-Setup.exe killBottleneck-Setup.exe.blockmap latest.yml > SHA256SUMS.txt
           cat SHA256SUMS.txt
 
-      # Žádné upload-artifact: artefakty se počítají do kvóty úložiště Actions, assety vydání ne.
+      # Předání druhému jobu (veřejné repo = úložiště artefaktů zdarma; drží se 1 den).
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: vydani
+          path: vydani/
+          retention-days: 1
+          if-no-files-found: error
+
+  # Jediný job s právem zápisu: bez checkoutu, bez npm, jen nahraje hotové soubory jako KONCEPT.
+  vydani:
+    needs: stavba
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: vydani
+          path: vydani
+
+      - name: Kontrolní součty sedí
+        working-directory: vydani
+        run: sha256sum -c SHA256SUMS.txt
+
       - name: Koncept vydání
         if: startsWith(github.ref, 'refs/tags/v')
         env:
           GH_TOKEN: ${{ github.token }}
-        shell: bash
+          GH_REPO: ${{ github.repository }}
+        working-directory: vydani
         run: >-
           gh release create "${GITHUB_REF_NAME}" --draft --verify-tag
           --title "killBottleneck for Windows ${GITHUB_REF_NAME#v}"
           --notes "Draft — published after the click-test. Changes: see CHANGELOG.md."
-          dist/killBottleneck-Setup.exe dist/killBottleneck-Setup.exe.blockmap dist/latest.yml dist/SHA256SUMS.txt
+          killBottleneck-Setup.exe killBottleneck-Setup.exe.blockmap latest.yml SHA256SUMS.txt
 
       # Ruční běh → koncept „test-build“ (nikdy veřejný, nikdy „latest“).
       - name: Testovací koncept
         if: github.event_name == 'workflow_dispatch'
         env:
           GH_TOKEN: ${{ github.token }}
-        shell: bash
+          GH_REPO: ${{ github.repository }}
+        working-directory: vydani
         run: |
           gh release delete test-build --yes --cleanup-tag 2>/dev/null || true
           gh release create test-build --draft --target "${GITHUB_SHA}" --title "test-build ${GITHUB_SHA::7}" \
             --notes "Test build — not for distribution." \
-            dist/killBottleneck-Setup.exe dist/killBottleneck-Setup.exe.blockmap dist/latest.yml dist/SHA256SUMS.txt
+            killBottleneck-Setup.exe killBottleneck-Setup.exe.blockmap latest.yml SHA256SUMS.txt

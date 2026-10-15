@@ -7,7 +7,7 @@
 // lib/politika.js jako čisté funkce s testy; tady se jen napojuje na události Electronu.
 import {
   BrowserWindow, Menu, Notification, Tray, app, clipboard, crashReporter, dialog, ipcMain,
-  nativeImage, nativeTheme, powerMonitor, protocol, screen, session, shell,
+  nativeImage, nativeTheme, net, powerMonitor, protocol, screen, session, shell,
 } from 'electron';
 import { appendFileSync, existsSync, writeFileSync } from 'node:fs';
 import { lookup } from 'node:dns/promises';
@@ -25,7 +25,7 @@ import * as nastaveni from './lib/nastaveni.js';
 import { obnovRozmery, rezimListy, titulekOkna } from './lib/okno.js';
 import {
   Brzda, MISTNI_ORIGIN, MISTNI_SCHEMA, mistniSoubor, originOf, rozhodniNavigaci,
-  rozhodniOtevreni, smiKanal, smiOpravneni, smiVen,
+  rozhodniOtevreni, rozhodniStahovani, smiKanal, smiOpravneni, smiVen, zonaInternet,
 } from './lib/politika.js';
 import { jeStarsiServer, tokenZUlozeni } from './lib/server.js';
 
@@ -78,6 +78,7 @@ const stav = {
   nactenoV: 0,
   skrytoOd: 0,
   offlineCasovac: null,
+  maxPriZobrazeni: false,
   aktualizace: null,
   zive: [],
   e2ePopredi: null,
@@ -94,6 +95,8 @@ if (app.isPackaged && (app.commandLine.hasSwitch('remote-debugging-port') || app
 }
 
 if (E2E && process.env.KB_DESKTOP_USERDATA) app.setPath('userData', process.env.KB_DESKTOP_USERDATA);
+// Test oprávnění mikrofonu potřebuje zařízení — v dockeru žádné není.
+if (E2E) app.commandLine.appendSwitch('use-fake-device-for-media-stream');
 
 protocol.registerSchemesAsPrivileged([{ scheme: MISTNI_SCHEMA, privileges: { standard: true, secure: true } }]);
 
@@ -136,6 +139,12 @@ const fetchRamu = (url, opts = {}) => {
 function ukazOkno() {
   if (!oknoZije()) return;
   if (stav.okno.isMinimized()) stav.okno.restore();
+  // Maximalizace až při prvním zobrazení: maximize() skryté okno UKÁŽE — po skrytém startu
+  // (autostart, tichá aktualizace) by jinak okno vyskočilo každému, kdo ho měl naposledy přes celou obrazovku.
+  if (stav.maxPriZobrazeni) {
+    stav.maxPriZobrazeni = false;
+    stav.okno.maximize();
+  }
   stav.okno.show();
   stav.okno.focus();
 }
@@ -175,14 +184,26 @@ function toast({ titulek, text, idNotifikace = null, poKliku = null }) {
   stav.zive.push(n);
   if (stav.zive.length > MAX_ZIVYCH) stav.zive.shift();
   const pust = () => { stav.zive = stav.zive.filter((x) => x !== n); };
+  // Upozornění patří organizaci, která byla aktivní, když vzniklo. Klik na starší upozornění
+  // po přepnutí na jinou firmu vrátí okno do té jeho (id notifikace jiná firma nezná).
+  const origin = stav.aktivni;
   n.on('click', () => {
     pust();
-    ukazOkno();
-    if (idNotifikace) otevriNotifikaci(idNotifikace);
-    else if (poKliku) poKliku();
+    klikNaUpozorneni({ origin, idNotifikace, poKliku });
   });
   n.on('failed', (_e, chyba) => { pust(); stav.log('upozornění selhalo', chyba); });
   n.show();
+}
+
+function klikNaUpozorneni({ origin, idNotifikace, poKliku }) {
+  e2e('klikUpozorneni', { origin, id: idNotifikace });
+  if (origin && origin !== stav.aktivni) {
+    prepniOrganizaci(origin);
+    return;
+  }
+  ukazOkno();
+  if (idNotifikace) otevriNotifikaci(idNotifikace);
+  else if (poKliku) poKliku();
 }
 
 function ukazUpozorneni(nove) {
@@ -219,32 +240,47 @@ function naviguj(cesta) {
 
 // ---------------------------------------------------------------- hlídač notifikací
 
+// Slib s časovým limitem: zaseklá stránka nesmí hlídač zastavit navždy.
+const sLimitem = (slib, ms) => {
+  let casovac;
+  const limit = new Promise((_, ne) => { casovac = setTimeout(() => ne(new Error('časový limit')), ms); });
+  return Promise.race([slib, limit]).finally(() => clearTimeout(casovac));
+};
+
 let koloOvereni = 0;
 async function dotazNaNotifikace() {
   if (!oknoUkazujeServer()) return { stav: 'nelze' };
   const origin = stav.aktivni;
+  // Organizace se mohla mezitím přepnout (každé await) — výsledek patří jen té, pro kterou vznikl.
+  const jinde = () => origin !== stav.aktivni;
+  let puvod;
   let ulozeni;
   try {
     // Přihlášení drží stránka v localStorage (PocketBase SDK). Čte se v ODDĚLENÉM světě
-    // (1999), takže skripty stránky do čtení nezasáhnou; úložiště je sdílené.
-    ulozeni = await stav.okno.webContents.executeJavaScriptInIsolatedWorld(
-      1999, [{ code: 'localStorage.getItem("pocketbase_auth")' }]);
+    // (1999), takže skripty stránky do čtení nezasáhnou; úložiště je sdílené. Spolu s ním
+    // původ stránky, ze které se četlo: přihlášení jedné firmy nesmí odejít serveru jiné.
+    const surove = await sLimitem(stav.okno.webContents.executeJavaScriptInIsolatedWorld(
+      1999, [{ code: 'JSON.stringify([location.origin, localStorage.getItem("pocketbase_auth")])' }]), 5000);
+    [puvod, ulozeni] = JSON.parse(surove);
   } catch {
     return { stav: 'nelze' };
   }
+  if (puvod !== origin || jinde()) return { stav: 'nelze' };
   const prihlaseni = tokenZUlozeni(ulozeni);
   if (!prihlaseni) return { stav: 'neprihlasen' };
   if (prihlaseni.vyprselo) return { stav: 'odmitnuto', uzivatel: prihlaseni.uzivatel };
+  if (!(await httpVSiti(origin)) || jinde()) return { stav: 'chyba' };
   const hlavicky = { Authorization: prihlaseni.token };
   const q = new URLSearchParams({ filter: 'read=false', sort: '-created', perPage: '30', fields: 'id,type,text,count,created' });
   try {
     const res = await fetchRamu(`${origin}/api/collections/notifications/records?${q}`, {
       headers: hlavicky, cache: 'no-store', signal: AbortSignal.timeout(10_000),
     });
-    if (origin !== stav.aktivni) return { stav: 'nelze' };
+    if (jinde()) return { stav: 'nelze' };
     if (res.status === 401 || res.status === 403) return { stav: 'odmitnuto', uzivatel: prihlaseni.uzivatel };
     if (!res.ok) return { stav: 'chyba' };
     const data = await res.json();
+    if (jinde()) return { stav: 'nelze' };
     const celkem = Number(data.totalItems) || 0;
     // PocketBase neplatný token neodmítne — jen ho bere jako nepřihlášeného a vrátí prázdný
     // seznam. Při nule proto občas ověřit, že přihlášení pořád platí (jinak by upozornění
@@ -253,6 +289,7 @@ async function dotazNaNotifikace() {
       const over = await fetchRamu(`${origin}/api/collections/users/records/${encodeURIComponent(prihlaseni.uzivatel)}?fields=id`, {
         headers: hlavicky, cache: 'no-store', signal: AbortSignal.timeout(10_000),
       });
+      if (jinde()) return { stav: 'nelze' };
       if (over.status === 401 || over.status === 403 || over.status === 404) return { stav: 'odmitnuto', uzivatel: prihlaseni.uzivatel };
     }
     return {
@@ -287,19 +324,72 @@ function ulozRozdelane(maxMs = 3500) {
 
 // Kontrola serveru před KAŽDÝM načtením (start, obnovení, opakování): když server nejede,
 // ukáže se místní stránka — nikdy chyba prohlížeče a nikdy stará stránka z mezipaměti.
-async function zkontrolujServer(origin, { timeoutMs = 5000 } = {}) {
+// http jen v místní síti: jméno (server.lan) se ověřilo přes DNS při přidání organizace, ale
+// DNS se mění (jiná síť, veřejný záznam téhož jména) → ověřit znovu před každým načtením
+// a před každým dotazem hlídače, ať přihlášení nejde nešifrovaně přes internet.
+async function httpVSiti(origin) {
+  const n = normalizujAdresu(origin);
+  if (!n.ok) return false;
+  if (!n.overitPrivatni) return true;
   try {
-    const res = await fetchRamu(`${origin}/api/health`, {
-      cache: 'no-store', redirect: 'follow', signal: AbortSignal.timeout(timeoutMs),
+    return vseDoPrivatniSite(await lookup(new URL(origin).hostname, { all: true }));
+  } catch {
+    return false;
+  }
+}
+
+// GET s přesměrováním jen v rámci téhož stroje (typicky http → https). Na jiný stroj se rám
+// ani nezeptá: přihlašovací stránka hotelové Wi-Fi, nebo server, který by chtěl rám poslat
+// na zařízení v síti uživatele (router…). fetch s redirect:'manual' to v Electronu neumí
+// (přesměrování jen zruší chybou), proto net.request. Vrací { status, hlavicka(), telo, url }
+// nebo { jinam: true }.
+function dotazNaTentyzStroj(url, timeoutMs) {
+  return new Promise((hotovo, chyba) => {
+    let konecny = url;
+    let kroku = 0;
+    const pozadavek = net.request({ url, session: stav.ses, redirect: 'manual', cache: 'no-store' });
+    const casovac = setTimeout(() => { pozadavek.abort(); chyba(new Error('časový limit')); }, timeoutMs);
+    const konec = (fn, v) => { clearTimeout(casovac); fn(v); };
+    pozadavek.on('redirect', (_kod, _metoda, cil) => {
+      let dalsi = null;
+      try { dalsi = new URL(cil, konecny); } catch { /* nesmysl = jinam */ }
+      if (!dalsi || ++kroku > 4 || dalsi.hostname !== new URL(konecny).hostname || !/^https?:$/.test(dalsi.protocol)) {
+        pozadavek.abort();
+        konec(hotovo, { jinam: true });
+        return;
+      }
+      konecny = dalsi.href;
+      pozadavek.followRedirect();
     });
+    pozadavek.on('response', (res) => {
+      const casti = [];
+      let delka = 0;
+      res.on('data', (c) => { delka += c.length; if (delka <= 65_536) casti.push(c); });
+      res.on('end', () => konec(hotovo, {
+        status: res.statusCode,
+        hlavicka: (k) => { const v = res.headers[k]; return Array.isArray(v) ? v[0] : (v ?? null); },
+        telo: Buffer.concat(casti).toString('utf8'),
+        url: konecny,
+      }));
+      res.on('error', (e) => konec(chyba, e));
+    });
+    pozadavek.on('error', (e) => konec(chyba, e));
+    pozadavek.end();
+  });
+}
+
+async function zkontrolujServer(origin, { timeoutMs = 5000 } = {}) {
+  if (!(await httpVSiti(origin))) return { ok: false, duvod: 'mimoSit' };
+  try {
+    const res = await dotazNaTentyzStroj(`${origin}/api/health`, timeoutMs);
+    if (res.jinam) return { ok: false, duvod: 'sit' };
     // Cloudflare výzva (ochrana proti robotům): okno ji vyřeší samo, kontrola ne.
-    if (res.headers.get('cf-mitigated') === 'challenge') return { ok: true, origin };
+    if (res.hlavicka('cf-mitigated') === 'challenge') return { ok: true, origin };
     const konecny = originOf(res.url) || origin;
-    // Přesměrování na jiný stroj = přihlašovací stránka hotelové Wi-Fi apod., ne náš server.
-    if (hostZ(konecny).replace(/:\d+$/, '') !== hostZ(origin).replace(/:\d+$/, '')) return { ok: false, duvod: 'sit' };
     if (res.status >= 500) return { ok: false, duvod: 'server' };
-    if (!res.ok) return { ok: false, duvod: 'neniKb' };
-    const telo = await res.json().catch(() => null);
+    if (res.status < 200 || res.status >= 300) return { ok: false, duvod: 'neniKb' };
+    let telo = null;
+    try { telo = JSON.parse(res.telo); } catch { /* není JSON */ }
     if (!telo || typeof telo !== 'object' || !('code' in telo || 'message' in telo)) return { ok: false, duvod: 'neniKb' };
     return { ok: true, origin: konecny };
   } catch {
@@ -312,13 +402,18 @@ async function verzeServeru(origin) {
     const res = await fetchRamu(`${origin}/api/kb/config`, { cache: 'no-store', signal: AbortSignal.timeout(5000) });
     if (!res.ok) return { kb: false };
     const data = await res.json();
-    return data && typeof data === 'object' && 'version' in data ? { kb: true, verze: String(data.version || '') } : { kb: false };
+    if (!data || typeof data !== 'object' || !('version' in data)) return { kb: false };
+    // Verzi server jen ohlašuje — do okna O aplikaci smí jen tvar čísla verze, ne libovolný text.
+    const verze = String(data.version || '');
+    return { kb: true, verze: /^[0-9A-Za-z.+-]{1,40}$/.test(verze) ? verze : '' };
   } catch {
     return { kb: false };
   }
 }
 
 function ukazMistni(stranka, data = {}) {
+  // Čekající opakování z offline stránky by jinak za chvíli přepsalo rozepsaný výběr organizace.
+  clearTimeout(stav.offlineCasovac);
   stav.mistniStav = { stranka, ...data };
   if (!oknoZije()) return Promise.resolve();
   e2e('mistni', { stranka, duvod: data.duvod || null });
@@ -356,7 +451,6 @@ async function nactiServer({ duvod = 'start' } = {}) {
   if (origin !== stav.aktivni) return undefined; // mezitím přepnuto jinam
   if (!k.ok) return ukazOffline(k.duvod);
   if (k.origin !== origin && !prijmiPresun(origin, k.origin)) return ukazOffline('neniKb');
-  stav.flushPodporovan = false;
   stav.nactenoV = Date.now();
   e2e('nacitam', { origin: stav.aktivni, duvod });
   if (oknoUkazujeServer()) {
@@ -389,10 +483,11 @@ async function prepniOrganizaci(origin) {
   ukazOkno();
   if (origin === stav.aktivni && oknoUkazujeServer()) return;
   await ulozRozdelane();
+  const jina = origin !== stav.aktivni;
   stav.nast = nastaveni.pridejOrganizaci(stav.nast, { origin });
   stav.aktivni = stav.nast.aktivni;
   ulozNastaveni();
-  stav.hlidac.reset();
+  if (jina) stav.hlidac.reset();
   prestavMenu();
   await nactiServer({ duvod: 'prepnuti' });
 }
@@ -411,7 +506,7 @@ const chyba = (kod, host = '') => ({ ok: false, chyba: kod, host });
 async function overServer(origin) {
   const host = hostZ(origin);
   const k = await zkontrolujServer(origin);
-  if (!k.ok) return chyba(k.duvod === 'neniKb' ? 'neniKb' : 'nedostupne', host);
+  if (!k.ok) return chyba({ neniKb: 'neniKb', mimoSit: 'httpMimoSit' }[k.duvod] || 'nedostupne', host);
   const v = await verzeServeru(k.origin);
   if (!v.kb) return chyba('neniKb', host);
   stav.overene.add(k.origin);
@@ -441,10 +536,11 @@ async function overAdresu(vstup) {
 
 function pripojOrganizaci(origin, nazev) {
   if (!stav.overene.has(origin)) return { ok: false };
+  const jina = origin !== stav.aktivni;
   stav.nast = nastaveni.pridejOrganizaci(stav.nast, { origin, nazev: zkrat(nazev, 120) });
   stav.aktivni = stav.nast.aktivni;
   ulozNastaveni();
-  stav.hlidac.reset();
+  if (jina) stav.hlidac.reset();
   prestavMenu();
   nactiServer({ duvod: 'pripojeni' });
   return { ok: true };
@@ -507,10 +603,11 @@ function zaregistrujKanaly() {
     stav.flushPodporovan = true;
     e2e('flushPodporovan');
   });
+  // Hotové uložení vyřeší i starší čekající (dvě žádosti rychle po sobě — stránka hlásí jen poslední).
   ipcMain.on('kb:flushDone', (e, id) => {
     if (!odServeru(e)) return;
-    const konec = stav.cekajiciFlush.get(Number(id));
-    if (konec) konec();
+    const hotovo = Number(id);
+    for (const [cekajici, konec] of [...stav.cekajiciFlush]) if (cekajici <= hotovo) konec();
   });
   ipcMain.on('kb:openTaken', (e, id) => {
     if (!odServeru(e) || !stav.otevreni || stav.otevreni.id !== id) return;
@@ -545,23 +642,39 @@ function volnaCesta(slozka, jmeno) {
   return cesta;
 }
 
+// Soubor uložený z okna dostane značku „staženo z internetu“ — Windows pak před spuštěním
+// varuje stejně jako u souboru z prohlížeče.
+function oznacZInternetu(cesta, url) {
+  if (process.platform !== 'win32' || !cesta) return;
+  try { writeFileSync(`${cesta}:Zone.Identifier`, zonaInternet(url)); } catch (e) { stav.log('značka staženého souboru selhala', e && e.message); }
+}
+
 // Jeden soubor → klasický dialog „Uložit jako“. Dávka (víc souborů během pár sekund, třeba
-// rozdělené PDF) → rovnou do Stažených a jedno upozornění, ne deset dialogů za sebou.
+// rozdělené PDF) → rovnou do Stažených a jedno upozornění, ne deset dialogů za sebou — jen
+// běžné dokumenty a jen při viditelném okně; skryté okno nestahuje nic (lib/politika.js).
 let posledniStazeni = 0;
-function naStahovani(_e, polozka) {
+let casyStazeni = [];
+function naStahovani(e, polozka) {
   const ted = Date.now();
   const davka = ted - posledniStazeni < 3000;
   posledniStazeni = ted;
+  casyStazeni = [...casyStazeni.filter((t) => ted - t < 60_000), ted];
   const jmeno = bezpecneJmeno(polozka.getFilename());
-  if (E2E) {
-    polozka.setSavePath(volnaCesta(process.env.KB_DESKTOP_E2E_STAZENE || tmpdir(), jmeno));
-  } else if (davka) {
-    polozka.setSavePath(volnaCesta(app.getPath('downloads'), jmeno));
-    polozka.once('done', (_e2, vysledek) => {
-      if (vysledek === 'completed') toast({ titulek: 'killBottleneck', text: stav.t('upozorneni.ulozenoStazene', { soubor: jmeno }) });
-    });
+  const rozhodnuti = rozhodniStahovani({ jmeno, davka, skryte: oknoSkryte(), zaMinutu: casyStazeni.length });
+  e2e('stahovani', { soubor: jmeno, davka, rozhodnuti });
+  if (rozhodnuti === 'zrusit') {
+    stav.log('stahování zamítnuto', davka ? 'dávka' : '');
+    e.preventDefault();
+    return;
   }
-  e2e('stahovani', { soubor: jmeno, davka });
+  const url = polozka.getURL();
+  if (E2E) polozka.setSavePath(volnaCesta(process.env.KB_DESKTOP_E2E_STAZENE || tmpdir(), jmeno));
+  else if (rozhodnuti === 'stazene') polozka.setSavePath(volnaCesta(app.getPath('downloads'), jmeno));
+  polozka.once('done', (_e2, vysledek) => {
+    if (vysledek !== 'completed') return;
+    oznacZInternetu(polozka.getSavePath(), url);
+    if (rozhodnuti === 'stazene' && !E2E) toast({ titulek: 'killBottleneck', text: stav.t('upozorneni.ulozenoStazene', { soubor: jmeno }) });
+  });
 }
 
 // ---------------------------------------------------------------- session a webContents
@@ -573,7 +686,7 @@ function zabezpecRelaci(ses) {
   ses.setPermissionRequestHandler((wc, opravneni, callback, details = {}) => {
     const origin = originOf(details.requestingUrl || (wc && wc.getURL()) || '');
     const ok = smiOpravneni(opravneni, {
-      origin, aktivniOrigin: stav.aktivni, mediaTypes: details.mediaTypes, externalURL: details.externalURL,
+      origin, aktivniOrigin: stav.aktivni, mediaTypes: details.mediaTypes, externalURL: details.externalURL, vPopredi: oknoVPopredi(),
     });
     if (!ok) stav.log('oprávnění zamítnuto', opravneni);
     e2e('opravneni', { opravneni, ok });
@@ -676,7 +789,12 @@ function klavesy(wc, e, vstup) {
   const ctrl = vstup.control || vstup.meta;
   const k = vstup.key;
   const zastav = () => e.preventDefault();
-  if ((ctrl && k.toLowerCase() === 'r') || k === 'F5') { zastav(); obnovit(); return; }
+  if ((ctrl && k.toLowerCase() === 'r') || k === 'F5') {
+    zastav();
+    // Na výběru organizace nic: obnovení by odvedlo na aktivní firmu a smazalo rozepsané.
+    if (oknoUkazujeServer() || stav.mistniStav.stranka !== 'vyber') obnovit();
+    return;
+  }
   if (k === 'F11') { zastav(); stav.okno.setFullScreen(!stav.okno.isFullScreen()); return; }
   if (ctrl && (k === '+' || k === '=')) { zastav(); wc.setZoomLevel(Math.min(5, wc.getZoomLevel() + 0.5)); return; }
   if (ctrl && k === '-') { zastav(); wc.setZoomLevel(Math.max(-3, wc.getZoomLevel() - 0.5)); return; }
@@ -713,7 +831,7 @@ function vytvorOkno() {
   });
   stav.okno = okno;
   okno.setMenuBarVisibility(false);
-  if (r.maximized) okno.maximize();
+  stav.maxPriZobrazeni = !!r.maximized;
   const wc = okno.webContents;
 
   okno.on('close', (e) => {
@@ -750,12 +868,14 @@ function vytvorOkno() {
     e.preventDefault();
     okno.setTitle(oknoUkazujeServer() ? titulekOkna(titulek, hostAktivni()) : 'killBottleneck');
   });
-  wc.on('did-start-navigation', (d) => { if (d && d.isMainFrame && !d.isSameDocument) stav.flushPodporovan = false; });
   wc.on('did-fail-load', (_e, kod, _popis, url, hlavni) => {
     if (!hlavni || kod === -3) return; // -3 = zrušeno další navigací
     if (originOf(url) === stav.aktivni) ukazOffline('sit');
   });
   wc.on('did-navigate', (_e, url, httpKod) => {
+    // Nový dokument v okně: uložení rozdělané práce umí jen ten, který to znovu ohlásí.
+    // (Ne už při ZAČÁTKU navigace — ta nemusí doběhnout, třeba když odkaz skončí stažením.)
+    stav.flushPodporovan = false;
     if (originOf(url) === stav.aktivni && httpKod >= 500) ukazOffline('server');
   });
   wc.on('render-process-gone', (_e, d) => {
@@ -890,12 +1010,13 @@ async function smokeTest() {
 
 function e2eOvladani() {
   createInterface({ input: process.stdin }).on('line', (radek) => {
-    const [prikaz, arg] = radek.trim().split(/\s+/, 2);
+    const [prikaz, arg, arg2] = radek.trim().split(/\s+/, 3);
     if (prikaz === 'skryj') stav.okno.hide();
     else if (prikaz === 'ukaz') ukazOkno();
     else if (prikaz === 'popredi') stav.e2ePopredi = arg === 'ano' ? true : arg === 'ne' ? false : null;
     else if (prikaz === 'kolo') stav.hlidac.ted();
-    else if (prikaz === 'klikni' && arg) { ukazOkno(); otevriNotifikaci(arg); }
+    else if (prikaz === 'klikni' && arg) klikNaUpozorneni({ origin: stav.aktivni, idNotifikace: arg });
+    else if (prikaz === 'klikniZ' && arg && arg2) klikNaUpozorneni({ origin: arg, idNotifikace: arg2 });
     else if (prikaz === 'obnov') obnovit();
     else if (prikaz === 'probuzeni') poProbuzeni();
     else if (prikaz === 'novaVerze') obnovSkryte('test');
@@ -1007,6 +1128,11 @@ async function start() {
         await ulozRozdelane();
         stav.konci = true;
       },
+      zrusRestart: () => {
+        stav.konci = false;
+        stav.nast = nastaveni.vycisti({ ...stav.nast, poAktualizaciSkryte: false });
+        ulozNastaveni();
+      },
       pripraveno: (verze) => {
         stav.aktualizace = { verze };
         prestavMenu();
@@ -1017,6 +1143,18 @@ async function start() {
   if (E2E) e2eOvladani();
   e2e('pripraven', { verze: VERZE, aktivni: stav.aktivni });
 }
+
+// Nečekaná chyba v rámu: zapsat do logu, ne ukázat dialog s výpisem a nespadnout.
+process.on('uncaughtException', (e) => stav.log('nečekaná chyba', e && e.stack));
+process.on('unhandledRejection', (e) => stav.log('nečekaná chyba (slib)', e && (e.stack || e)));
+
+// Klientský certifikát z úložiště Windows: bez obsluhy by Electron poslal PRVNÍ certifikát
+// komukoli, kdo si o něj řekne (i obrázku z cizího serveru na stránce) — se jménem, e-mailem,
+// u kvalifikovaných i IČ. killBottleneck klientské certifikáty nepoužívá → nikdy žádný.
+app.on('select-client-certificate', (e, _wc, _url, _seznam, callback) => {
+  e.preventDefault();
+  callback();
+});
 
 const zamek = SMOKE || app.requestSingleInstanceLock();
 if (!zamek) {

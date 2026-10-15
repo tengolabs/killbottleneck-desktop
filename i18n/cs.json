@@ -75,6 +75,7 @@
       "popisSit": "Počítač asi není připojený k internetu, nebo server zrovna nejede.",
       "popisServer": "Server hlásí chybu — nejspíš se právě aktualizuje.",
       "popisNeniKb": "Na adrese {{host}} neběží killBottleneck.",
+      "popisMimoSit": "Server je v místní síti firmy a počítač v ní teď není — nešifrované spojení (http://) mimo ni aplikace nepoužije.",
       "automaticky": "Zkusím to znovu sám za chvíli.",
       "zkusitZnovu": "Zkusit znovu",
       "zmenit": "Změnit organizaci",

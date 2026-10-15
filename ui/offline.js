@@ -13,7 +13,7 @@
     $('paticka').hidden = false;
   } else {
     $('titulek').textContent = t('offline.titulek');
-    const duvod = { server: 'offline.popisServer', neniKb: 'offline.popisNeniKb' }[m.duvod] || 'offline.popisSit';
+    const duvod = { server: 'offline.popisServer', neniKb: 'offline.popisNeniKb', mimoSit: 'offline.popisMimoSit' }[m.duvod] || 'offline.popisSit';
     $('popis').textContent = `${t('offline.popis', { host })} ${t(duvod, { host })}`;
     $('karta').hidden = false;
   }
