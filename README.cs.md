@@ -1,7 +1,7 @@
 # killBottleneck pro Windows
 
 [killBottleneck](https://killbottleneck.cz) vaší organizace ve vlastním okně — s upozorněními
-Windows i se zavřeným oknem, počtem nepřečtených u hodin a volitelným spuštěním se systémem.
+Windows i se zavřeným oknem, počtem nepřečtených u hodin; spouští se se systémem (vypnout to jde v menu ikony u hodin).
 
 [English](README.md)
 
@@ -31,7 +31,7 @@ Organizací může být víc; přepínají se v menu ikony u hodin.
 - **Upozornění:** jednou za minutu (a hned po probuzení počítače) se aplikace zeptá *vašeho* serveru
   na nepřečtená upozornění — s vaším přihlášením. Nová ukáže jako upozornění Windows; v titulku je
   adresa serveru, takže se upozornění nemůže vydávat za někoho jiného.
-- **Zavřením okna aplikace běží dál vedle hodin.** Ukončit ji jde v menu ikony.
+- **Zavřením okna aplikace běží dál vedle hodin** a spouští se i po zapnutí počítače, aby upozornění chodila. Obojí se vypíná v menu ikony u hodin (Ukončit, Spouštět po zapnutí počítače).
 - **Odkazy jinam** (platby, dokumentace, e-mail) se otevřou ve výchozím prohlížeči nebo poště — okno
   ukazuje vždy jen server vaší organizace.
 - **Aktualizace:** aplikace se při startu a pak každých 6 hodin podívá do vydání tohoto repozitáře na

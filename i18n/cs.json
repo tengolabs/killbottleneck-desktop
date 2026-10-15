@@ -19,14 +19,8 @@
     "prihlasteSe": "Upozornění teď nechodí. Otevřete aplikaci a přihlaste se znovu.",
     "ulozenoStazene": "Uloženo do složky Stažené: {{soubor}}",
     "aktualizacePripravena": "Nová verze {{verze}} je připravená. Nainstaluje se sama, až aplikaci zavřete — nebo hned přes menu u hodin.",
-    "beziDal": "killBottleneck běží dál vedle hodin a hlídá upozornění."
-  },
-  "autostart": {
-    "titulek": "killBottleneck",
-    "otazka": "killBottleneck poběží dál vedle hodin a bude hlídat upozornění. Spouštět ho i po zapnutí počítače?",
-    "detail": "Ikonu najdete v oznamovací oblasti vpravo dole. Ve Windows 11 bývá schovaná pod šipkou ^ — přetáhněte ji odtud na lištu, ať je pořád vidět. Volbu změníte kdykoli v menu ikony.",
-    "ano": "Ano, spouštět",
-    "ne": "Ne"
+    "beziDal": "killBottleneck běží dál vedle hodin a hlídá upozornění.",
+    "beziDalAutostart": "killBottleneck běží dál vedle hodin a hlídá upozornění. Spouští se i po zapnutí počítače — vypnout to jde v menu ikony u hodin."
   },
   "oAplikaci": {
     "titulek": "O aplikaci",

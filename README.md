@@ -1,8 +1,8 @@
 # killBottleneck for Windows
 
 Your organization's [killBottleneck](https://killbottleneck.com) in its own window — with Windows
-notifications even when the window is closed, an unread counter by the clock and an optional start
-with Windows.
+notifications even when the window is closed, an unread counter by the clock; it starts with
+Windows (turn that off in the menu of the icon by the clock).
 
 [Česky](README.cs.md)
 
@@ -34,7 +34,8 @@ You can keep several organizations and switch between them in the menu of the ic
   server for your unread notifications, using your own sign-in. New ones appear as Windows
   notifications; the server's address is in the title, so a notification can't pretend to come
   from somewhere else.
-- **Closing the window keeps the app running by the clock.** Quit it from the icon's menu.
+- **Closing the window keeps the app running by the clock**, and it starts with your computer so notifications
+  keep coming. Both are in the icon's menu (Quit, Start when the computer starts).
 - **Links to other sites** (payments, documentation, e-mail) open in your default browser or mail
   app — the window only ever shows your organization's server.
 - **Updates:** the app checks GitHub Releases of this repository at start and every 6 hours and

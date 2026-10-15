@@ -7,7 +7,7 @@ import { nacti, odeberOrganizaci, pridejOrganizaci, uloz, vycisti } from '../lib
 
 test('výchozí nastavení', () => {
   assert.deepEqual(vycisti(null), {
-    verze: 1, organizace: [], aktivni: null, okno: null, autostartNabidnut: false, poAktualizaciSkryte: false,
+    verze: 1, organizace: [], aktivni: null, okno: null, autostartAuto: false, zavreniOznameno: false, poAktualizaciSkryte: false,
   });
 });
 

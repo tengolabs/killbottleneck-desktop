@@ -19,14 +19,8 @@
     "prihlasteSe": "Notifications are paused. Open the app and sign in again.",
     "ulozenoStazene": "Saved to the Downloads folder: {{soubor}}",
     "aktualizacePripravena": "Version {{verze}} is ready. It installs itself when you close the app — or right away from the menu by the clock.",
-    "beziDal": "killBottleneck keeps running by the clock and watches your notifications."
-  },
-  "autostart": {
-    "titulek": "killBottleneck",
-    "otazka": "killBottleneck keeps running by the clock and watches your notifications. Start it whenever the computer starts?",
-    "detail": "The icon sits in the notification area at the bottom right. Windows 11 often hides it under the ^ arrow — drag it from there onto the taskbar to keep it visible. You can change this any time in the icon's menu.",
-    "ano": "Yes, start it",
-    "ne": "No"
+    "beziDal": "killBottleneck keeps running by the clock and watches your notifications.",
+    "beziDalAutostart": "killBottleneck keeps running by the clock and watches your notifications. It also starts with your computer — turn that off in the menu of the icon by the clock."
   },
   "oAplikaci": {
     "titulek": "About",

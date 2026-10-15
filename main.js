@@ -720,7 +720,7 @@ function vytvorOkno() {
     if (stav.konci) return;
     e.preventDefault();
     okno.hide();
-    nabidniAutostart();
+    oznamBehNaPozadi();
   });
   okno.on('hide', () => { stav.skrytoOd = Date.now(); });
   okno.on('show', () => {
@@ -783,28 +783,22 @@ function nastavAutostart(zapnout) {
   prestavMenu();
 }
 
-// Při prvním zavření okna: aplikace běží dál vedle hodin — zeptat se, jestli ji spouštět
-// i po zapnutí počítače (jinak by po restartu upozornění nechodila), a poradit s ikonou.
-async function nabidniAutostart() {
-  if (stav.nast.autostartNabidnut) return;
-  stav.nast = nastaveni.vycisti({ ...stav.nast, autostartNabidnut: true });
+// Při prvním zavření okna jen OZNÁMIT, že aplikace běží dál vedle hodin (žádný dotaz —
+// modální okno laiky děsilo, Richard 15. 10. 2026). Spouštění se systémem zapíná start sám.
+function oznamBehNaPozadi() {
+  if (stav.nast.zavreniOznameno) return;
+  stav.nast = nastaveni.vycisti({ ...stav.nast, zavreniOznameno: true });
   ulozNastaveni();
-  if (!autostartPodporovan()) return;
-  if (autostartZapnut()) {
-    toast({ titulek: 'killBottleneck', text: stav.t('upozorneni.beziDal') });
-    return;
-  }
-  const { response } = await dialog.showMessageBox({
-    type: 'question',
-    title: stav.t('autostart.titulek'),
-    message: stav.t('autostart.otazka'),
-    detail: stav.t('autostart.detail'),
-    buttons: [stav.t('autostart.ano'), stav.t('autostart.ne')],
-    defaultId: 0,
-    cancelId: 1,
-    noLink: true,
-  });
-  if (response === 0) nastavAutostart(true);
+  toast({ titulek: 'killBottleneck', text: stav.t(autostartZapnut() ? 'upozorneni.beziDalAutostart' : 'upozorneni.beziDal') });
+}
+
+// Spouštění se systémem se zapne SAMO při prvním spuštění (jinak by po restartu počítače
+// upozornění nechodila) — jen jednou: kdo si ho pak v menu vypne, tomu se už nezapne.
+function zapniAutostartPoprve() {
+  if (stav.nast.autostartAuto) return;
+  stav.nast = nastaveni.vycisti({ ...stav.nast, autostartAuto: true });
+  ulozNastaveni();
+  if (autostartPodporovan() && !autostartZapnut()) nastavAutostart(true);
 }
 
 function prestavMenu() {
@@ -985,6 +979,7 @@ async function start() {
   stav.tray.setToolTip(stav.t('tray.tooltip'));
   stav.tray.on('click', () => ukazOkno());
   prestavMenu();
+  zapniAutostartPoprve();
 
   const skryte = (START_SKRYTE || stav.nast.poAktualizaciSkryte) && !!stav.aktivni;
   if (stav.nast.poAktualizaciSkryte) {
