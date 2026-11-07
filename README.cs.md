@@ -72,5 +72,5 @@ Repozitář se vydává z monorepa killBottlenecku; hlášení chyb tu vítáme,
 
 ## Licence
 
-[Sustainable Use License](LICENSE) — stejná jako killBottleneck. Licence Electronu (MIT) a Chromia
+[MIT](LICENSE) — stejná jako killBottleneck; jméno a logo zůstávají autorům ([TRADEMARKS.md](https://github.com/tengolabs/killbottleneck/blob/main/TRADEMARKS.md)). Licence Electronu (MIT) a Chromia
 jsou přibalené v instalačce.

@@ -5,7 +5,7 @@
   "description": "killBottleneck for Windows — your organization's killBottleneck in its own window, with Windows notifications.",
   "author": "Tengo s.r.o. <info@killbottleneck.com>",
   "homepage": "https://killbottleneck.com",
-  "license": "SEE LICENSE IN LICENSE",
+  "license": "MIT",
   "private": true,
   "type": "module",
   "main": "main.js",

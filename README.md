@@ -77,5 +77,5 @@ requests get ported by hand.
 
 ## License
 
-[Sustainable Use License](LICENSE) — the same as killBottleneck. Electron (MIT) and Chromium
+[MIT](LICENSE) — the same as killBottleneck; the name and logo stay with the authors ([TRADEMARKS.md](https://github.com/tengolabs/killbottleneck/blob/main/TRADEMARKS.md)). Electron (MIT) and Chromium
 licenses ship with the installer.
